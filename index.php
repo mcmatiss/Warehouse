@@ -16,22 +16,15 @@ function isInputValid(int $userInput, int $minValue, int $maxValue): bool
 $consoleColor = new ConsoleColor();
 $warehouse = new Warehouse();
 
-if (file_exists("storedProducts.json")) {
-    $products = json_decode(file_get_contents("storedProducts.json"));
-    //    foreach ($products as $product) {
-    //        $warehouse->addProduct($product);
-    //    }
-    //var_dump($products);
-}
 
-$users = json_decode(file_get_contents("users.json"));
+$users = json_decode(file_get_contents("data/users.json"));
 
 $userIsValid = false;
 do {
     echo "Please login.\n";
-    $userName = readline("Username: ");
-    foreach ($users as $user) {
-        if ($user->username === $userName) {
+    $user = readline("Username: ");
+    foreach ($users as $userName) {
+        if ($userName->username === $user) {
             $userIsValid = true;
         }
     }
@@ -40,8 +33,8 @@ do {
         $userIsValid = false;
     } else {
         $password = readline("Password: ");
-        foreach ($users as $user) {
-            if ($user->password === $password) {
+        foreach ($users as $userName) {
+            if ($userName->password === $password) {
                 $userIsValid = true;
             }
         }
@@ -49,7 +42,7 @@ do {
 } while ($userIsValid === false);
 
 do {
-    echo "\nLogged in as $userName.\n";
+    echo "\nLogged in as $user.\n";
     $table = new ConsoleTable();
     $table
         ->addHeader("Index")
@@ -90,18 +83,19 @@ do {
         echo $consoleColor->apply(
             "color_240",
             "2. Withdraw product.\n" .
-                "3. Change product name.\n" .
-                "4. Change product unit amount.\n" .
-                "5. Remove product.\n"
+            "3. Change product name.\n" .
+            "4. Change product unit amount.\n" .
+            "5. Remove product.\n"
         );
     }
-    echo "6. Exit.\n";
+    echo "6. View logs.\n" .
+        "7. Exit.\n";
 
-    $mainMenuChoice = (int) readline("Main Menu Choice: ");
+    $mainMenuChoice = (int)readline("Main Menu Choice: ");
     switch ($mainMenuChoice) {
         case 1:
             $productName = readline("Product name: ");
-            $productInStock = (int) readline("Units in stock: ");
+            $productInStock = (int)readline("Units in stock: ");
             if ($productInStock <= 0) {
                 readline(
                     "Invalid input. Amount of units in stock cant be less than 1. Press any key to continue..."
@@ -109,16 +103,27 @@ do {
                 break;
             }
             $warehouse->addProduct(new Product($productName, $productInStock));
+            $newestProduct = $warehouse->products()[count($warehouse->products()) - 1];
+            $warehouse->createLog(
+                $newestProduct->getCreatedAt(),
+                $newestProduct->getId(),
+                $user,
+                "added [" .
+                $productInStock .
+                "] units of the new product: [" .
+                $productName .
+                "]"
+            );
             break;
         case 2:
-            $productChoice = (int) readline("Enter product index: ");
+            $productChoice = (int)readline("Enter product index: ");
             if (
                 !isInputValid($productChoice, 1, count($warehouse->products()))
             ) {
                 readline("Invalid input. Press any key to continue...");
                 break;
             }
-            $withdrawAmount = (int) readline("Withdraw Amount: ");
+            $withdrawAmount = (int)readline("Withdraw Amount: ");
             if (
                 !isInputValid(
                     $withdrawAmount,
@@ -129,14 +134,21 @@ do {
                 readline("Invalid input. Press any key to continue...");
                 break;
             }
-            $warehouse
-                ->products()
-                [$productChoice - 1]->withdrawUnits($withdrawAmount);
-            $warehouse->products()[$productChoice - 1]->update();
-            // TODO: LOG: $user - withdrew $withdrawAmount units of $warehouse->products()[$productChoice-1]->getName() id: $warehouse->products()[$productChoice-1]->getId() at $warehouse->products()[$productChoice-1]->$product->getUpdatedAt()
+            $selectedProduct = $warehouse->products()[$productChoice - 1];
+            $selectedProduct->withdrawUnits($withdrawAmount);
+            $warehouse->createLog(
+                $selectedProduct->getUpdatedAt(),
+                $selectedProduct->getId(),
+                $user,
+                "withdrew [" .
+                $withdrawAmount .
+                "] units from product: [" .
+                $selectedProduct->getName() .
+                "]"
+            );
             break;
         case 3:
-            $productChoice = (int) readline("Enter product index: ");
+            $productChoice = (int)readline("Enter product index: ");
             if (
                 !isInputValid($productChoice, 1, count($warehouse->products()))
             ) {
@@ -144,59 +156,77 @@ do {
                 break;
             }
             $productName = readline("Product name: ");
-            $previousProductName = $warehouse
-                ->products()
-                [$productChoice - 1]->getName();
-            $warehouse->products()[$productChoice - 1]->setName($productName);
-            $warehouse->products()[$productChoice - 1]->update();
-            // TODO: LOG: $user - changed the name of $previousProductName id: $warehouse->products()[$productChoice-1]->getId() to $warehouse->products()[$productChoice-1]->getName() at $warehouse->products()[$productChoice-1]->$product->getUpdatedAt()
+            $selectedProduct = $warehouse->products()[$productChoice - 1];
+            $previousProductName = $selectedProduct->getName();
+            $selectedProduct->setName($productName);
+            $warehouse->createLog(
+                $selectedProduct->getUpdatedAt(),
+                $selectedProduct->getId(),
+                $user,
+                "changed the name of the product: [" .
+                $previousProductName .
+                "] to a new name: [" .
+                $productName .
+                "]"
+            );
             break;
         case 4:
-            $productChoice = (int) readline("Enter product index: ");
+            $productChoice = (int)readline("Enter product index: ");
             if (
                 !isInputValid($productChoice, 1, count($warehouse->products()))
             ) {
                 readline("Invalid input. Press any key to continue...");
                 break;
             }
-            $productInStock = (int) readline("Units in stock: ");
+            $productInStock = (int)readline("Units in stock: ");
             if ($productInStock <= 0) {
                 readline(
                     "Invalid input. Amount of units in stock cant be less than 1. Press any key to continue..."
                 );
                 break;
             }
-            $previousUnitAmount = $warehouse
-                ->products()
-                [$productChoice - 1]->getUnits();
-            $warehouse
-                ->products()
-                [$productChoice - 1]->setUnits($productInStock);
-            $warehouse->products()[$productChoice - 1]->update();
-            // TODO: LOG: $user - changed $warehouse->products()[$productChoice-1]->getName() id: $warehouse->products()[$productChoice-1]->getId() amount of units from $previousUnitAmount to $warehouse->products()[$productChoice-1]->getUnits() at $warehouse->products()[$productChoice-1]->$product->getUpdatedAt()
+            $selectedProduct = $warehouse->products()[$productChoice - 1];
+            $previousUnitAmount = $selectedProduct->getUnits();
+            $selectedProduct->setUnits($productInStock);
+            $warehouse->createLog(
+                $selectedProduct->getUpdatedAt(),
+                $selectedProduct->getId(),
+                $user,
+                "changed product: [" .
+                $selectedProduct->getName() .
+                "] units from [" .
+                $previousUnitAmount .
+                "] to [" .
+                $productInStock .
+                "]"
+            );
             break;
         case 5:
-            $productChoice = (int) readline("Enter product index: ");
+            $productChoice = (int)readline("Enter product index: ");
             if (
                 !isInputValid($productChoice, 1, count($warehouse->products()))
             ) {
                 readline("Invalid input. Press any key to continue...");
                 break;
             }
-            $warehouse->products()[$productChoice - 1]->update();
-            // TODO: LOG: $user - removed $warehouse->products()[$productChoice-1]->getName() id: $warehouse->products()[$productChoice-1]->getId() at $warehouse->products()[$productChoice-1]->$product->getUpdatedAt()
+            $selectedProduct = $warehouse->products()[$productChoice - 1];
+            $warehouse->createLog(
+                $selectedProduct->getUpdatedAt(),
+                $selectedProduct->getId(),
+                $user,
+                "removed product: [" .
+                $selectedProduct->getName() .
+                "]"
+            );
             $warehouse->removeProduct($productChoice - 1);
             break;
         case 6:
-            $storedProducts = $warehouse->jsonSerialize();
-            file_put_contents("storedProducts.json", $storedProducts);
+            $warehouse->viewLogs();
+            readline("Press any key to continue...");
+            break;
+        case 7:
             return false;
         default:
             readline("Invalid input. Press any key to continue...");
     }
 } while (true);
-
-// TODO Serialize and Un-serialize warehouse data
-
-// TODO When there are changes made to the amount of the product or the product is edited,
-//  there must be a log of what changes were made.
