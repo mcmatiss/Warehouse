@@ -2,88 +2,102 @@
 
 namespace App;
 
-class Warehouse
+use Carbon\Carbon;
+use JsonSerializable;
+
+class Product implements JsonSerializable
 {
-    private array $products = [];
-    private array $log = [];
-    private const STORAGE_PATH = 'data/';
+    private string $name;
+    private int $units;
+    private ?string $id;
+    private Carbon $createdAt;
+    private ?Carbon $updatedAt;
 
-    public function __construct()
+    public function __construct(
+        string  $name,
+        int     $units,
+        ?string $id = null,
+        ?string $createdAt = null,
+        ?string $updatedAt = null
+    )
     {
-        if (file_exists(self::STORAGE_PATH . "logs.json")) {
-            $log = json_decode(file_get_contents("data/logs.json"));
-            foreach ($log as $oldEntry) {
-                $this->log[] = $oldEntry;
-            }
-        }
-
-        if (file_exists(self::STORAGE_PATH . "storedProducts.json")) {
-            $products = file_get_contents(self::STORAGE_PATH . "storedProducts.json");
-            $products = json_decode($products);
-
-            foreach ($products as $product) {
-                $this->addProduct(new Product(
-                    $product->name,
-                    $product->units,
-                    $product->id,
-                    $product->createdAt,
-                    $product->updatedAt
-                ));
-            }
-        }
+        $this->name = $name;
+        $this->units = $units;
+        $this->id = $id ?: $this->generateUuid();
+        $this->createdAt = $createdAt ? Carbon::parse($createdAt) : Carbon::now('UTC');
+        $this->updatedAt = $updatedAt ? Carbon::parse($updatedAt) : null;
     }
 
-    public function products(): array
+    public function getName(): string
     {
-        return $this->products;
+        return $this->name;
     }
 
-    public function addProduct(Product $product): void
+    public function setName(string $name): void
     {
-        $this->products[] = $product;
+        $this->name = $name;
+
+        $this->update();
+    }
+
+    public function getUnits(): int
+    {
+        return $this->units;
+    }
+
+    public function setUnits(int $units): void
+    {
+        $this->units = $units;
+
+        $this->update();
+    }
+
+    public function withdrawUnits(int $amount): void
+    {
+        $this->units -= $amount;
+
+        $this->update();
+    }
+
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCreatedAt(): Carbon
+    {
+        return $this->createdAt->setTimezone('Europe/Riga');
+    }
+
+    public function getUpdatedAt(): ?Carbon
+    {
+        return $this->updatedAt ? $this->updatedAt->setTimezone('Europe/Riga') : null;
+    }
+
+    public function update(): void
+    {
+        $this->updatedAt = Carbon::now('UTC');
+
 
     }
 
-    public function removeProduct(int $index): void
+    public function generateUuid(): string
     {
-        array_splice($this->products, $index, 1);
-    }
-
-    public function createLog(string $time, string $id, string $user, string $msg): void
-    {
-        $this->log[] = "[$time] product id: [$id] user: [$user] - $msg";
-
-        $this->updateLogs();
-
-        $this->save();
-    }
-
-    public function viewLogs(): void
-    {
-        foreach ($this->log as $entry => $log) {
-            echo "[$entry] $log\n";
-        }
-    }
-
-    private function updateLogs(): void
-    {
-        file_put_contents(
-            self::STORAGE_PATH .
-            "logs.json",
-            json_encode($this->log,
-                JSON_PRETTY_PRINT
+        return json_decode(
+            file_get_contents(
+                'https://www.uuidtools.com/api/generate/v4'
             )
-        );
+        )[0];
     }
 
-    private function save(): void
+    public function jsonSerialize(): array
     {
-        file_put_contents(
-            self::STORAGE_PATH .
-            "storedProducts.json",
-            json_encode($this->products,
-                JSON_PRETTY_PRINT
-            )
-        );
+        return [
+            'name' => $this->name,
+            'units' => $this->units,
+            'id' => $this->id,
+            'createdAt' => $this->createdAt,
+            'updatedAt' => $this->updatedAt
+        ];
     }
 }
