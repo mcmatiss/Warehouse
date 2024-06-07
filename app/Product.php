@@ -1,75 +1,89 @@
 <?php
+
 namespace App;
 
-use Carbon\Carbon;
-use Ramsey\Uuid\Uuid;
-
-class Product
+class Warehouse
 {
-    private string $id;
-    private string $name;
-    private Carbon $createdAt;
-    private ?Carbon $updatedAt;
-    private int $units;
+    private array $products = [];
+    private array $log = [];
+    private const STORAGE_PATH = 'data/';
 
-    public function __construct(
-        string $name,
-        int $units,
-        Uuid $id = null,
-        Carbon $createdAt = null,
-        ?Carbon $updatedAt = null
-    )
+    public function __construct()
     {
-        $this->id = $id ? self::getId() : Uuid::uuid4();
-        $this->name = $name;
-        $this->createdAt = $createdAt ? new Carbon($createdAt) : Carbon::now('UTC');
-        $this->updatedAt = $updatedAt ? new Carbon($updatedAt) : null;
-        $this->units = $units;
+        if (file_exists(self::STORAGE_PATH . "logs.json")) {
+            $log = json_decode(file_get_contents("data/logs.json"));
+            foreach ($log as $oldEntry) {
+                $this->log[] = $oldEntry;
+            }
+        }
+
+        if (file_exists(self::STORAGE_PATH . "storedProducts.json")) {
+            $products = file_get_contents(self::STORAGE_PATH . "storedProducts.json");
+            $products = json_decode($products);
+
+            foreach ($products as $product) {
+                $this->addProduct(new Product(
+                    $product->name,
+                    $product->units,
+                    $product->id,
+                    $product->createdAt,
+                    $product->updatedAt
+                ));
+            }
+        }
     }
 
-    public function getId(): string
+    public function products(): array
     {
-        return $this->id;
+        return $this->products;
     }
 
-    public function getName(): string
+    public function addProduct(Product $product): void
     {
-        return $this->name;
+        $this->products[] = $product;
+
     }
 
-    public function setName(string $name): void
+    public function removeProduct(int $index): void
     {
-        $this->name = $name;
+        array_splice($this->products, $index, 1);
     }
 
-    public function getCreatedAt(): Carbon
+    public function createLog(string $time, string $id, string $user, string $msg): void
     {
-        return $this->createdAt->setTimezone('Europe/Riga');
+        $this->log[] = "[$time] product id: [$id] user: [$user] - $msg";
+
+        $this->updateLogs();
+
+        $this->save();
     }
 
-    public function getUpdatedAt(): ?Carbon
+    public function viewLogs(): void
     {
-        return $this->updatedAt ? $this->updatedAt->setTimezone('Europe/Riga') : null;
+        foreach ($this->log as $entry => $log) {
+            echo "[$entry] $log\n";
+        }
     }
 
-    public function update(): void
+    private function updateLogs(): void
     {
-        $this->updatedAt = Carbon::now('UTC');
+        file_put_contents(
+            self::STORAGE_PATH .
+            "logs.json",
+            json_encode($this->log,
+                JSON_PRETTY_PRINT
+            )
+        );
     }
 
-    public function getUnits(): int
+    private function save(): void
     {
-        return $this->units;
+        file_put_contents(
+            self::STORAGE_PATH .
+            "storedProducts.json",
+            json_encode($this->products,
+                JSON_PRETTY_PRINT
+            )
+        );
     }
-
-    public function setUnits(int $units): void
-    {
-        $this->units = $units;
-    }
-
-    public function withdrawUnits(int $amount): void
-    {
-        $this->units -= $amount;
-    }
-
 }
